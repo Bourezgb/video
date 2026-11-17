@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Assemble the Mutanabbi video: zoompan segments -> concat -> loudnorm mix -> phone + SRT + contact sheet."""
+"""Assemble v3.1 (horsefix): same as assemble_v3.py, but from
+stills_v3_horsefix/ into fresh segs_v3_horsefix/ and final
+mutanabbi-albayt-v3.1.mp4. Also fixes the assemble_v3.py contact-sheet
+bug: it listed stills_v3/ but opened stills/ (v1), so the v3 sheet had
+to be rebuilt by hand. Here the sheet is read from stills_v3_horsefix/.
+Run render_v3_horsefix.py first. v3 files are not touched."""
 import json, os, subprocess, sys
 from PIL import Image
 
 BASE = os.path.expanduser("~/workspace/bayt-wa-hikaya/mutanabbi-video")
 BUILD = f"{BASE}/build"
 FINAL = f"{BASE}/final"
-os.makedirs(f"{BUILD}/segs_v3", exist_ok=True)
+os.makedirs(f"{BUILD}/segs_v3_horsefix", exist_ok=True)
 os.makedirs(FINAL, exist_ok=True)
 
 def run(cmd, **kw):
@@ -18,8 +23,8 @@ segs = []
 for i, line in enumerate(timeline):
     dur = line["dur"]
     frames = max(30, int(round(dur * 30)))
-    seg = f"{BUILD}/segs_v3/{i+1:02d}_{line['id']}.mp4"
-    still = f"{BUILD}/stills_v3/{i+1:02d}_{line['id']}.jpg"
+    seg = f"{BUILD}/segs_v3_horsefix/{i+1:02d}_{line['id']}.mp4"
+    still = f"{BUILD}/stills_v3_horsefix/{i+1:02d}_{line['id']}.jpg"
     if not os.path.exists(seg):
         # rule 5: the fight segment pushes in hard, like a camera jolt
         rate = "0.0012" if line["id"] == "fights" else "0.0004"
@@ -28,18 +33,18 @@ for i, line in enumerate(timeline):
              "-t", str(dur), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", seg])
     segs.append(seg)
 # end card, 4.5s, very slight push-in
-end = f"{BUILD}/segs_v3/28_endcard.mp4"
+end = f"{BUILD}/segs_v3_horsefix/28_endcard.mp4"
 if not os.path.exists(end):
-    run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-i", f"{BUILD}/stills_v3/28_endcard.jpg",
+    run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-i", f"{BUILD}/stills_v3_horsefix/28_endcard.jpg",
          "-vf", "zoompan=z='min(zoom+0.0002,1.03)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=135:s=1080x1920:fps=30",
          "-t", "4.5", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", end])
 segs.append(end)
 
-with open(f"{BUILD}/concat_v3.txt", "w") as f:
+with open(f"{BUILD}/concat_v3_horsefix.txt", "w") as f:
     for s in segs:
         f.write(f"file '{s}'\n")
-run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", f"{BUILD}/concat_v3.txt",
-     "-c", "copy", f"{BUILD}/video_silent_v3.mp4"])
+run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", f"{BUILD}/concat_v3_horsefix.txt",
+     "-c", "copy", f"{BUILD}/video_silent_v3_horsefix.mp4"])
 
 # ---- audio: mix voice (trimmed, padded to 117.5s) + music, two-pass loudnorm ----
 # pass 1: measure
@@ -68,15 +73,15 @@ run(["ffmpeg", "-y", "-v", "error", "-i", f"{BUILD}/voice_trim.wav", "-i", f"{BU
      "-map", "[aout]", "-c:a", "aac", "-b:a", "160k", f"{BUILD}/mix.m4a"])
 
 # ---- mux ----
-run(["ffmpeg", "-y", "-v", "error", "-i", f"{BUILD}/video_silent_v3.mp4", "-i", f"{BUILD}/mix.m4a",
+run(["ffmpeg", "-y", "-v", "error", "-i", f"{BUILD}/video_silent_v3_horsefix.mp4", "-i", f"{BUILD}/mix.m4a",
      "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "copy",
-     "-movflags", "+faststart", f"{FINAL}/mutanabbi-albayt-v3.mp4"])
+     "-movflags", "+faststart", f"{FINAL}/mutanabbi-albayt-v3.1.mp4"])
 # phone version
-run(["ffmpeg", "-y", "-v", "error", "-i", f"{FINAL}/mutanabbi-albayt-v3.mp4",
+run(["ffmpeg", "-y", "-v", "error", "-i", f"{FINAL}/mutanabbi-albayt-v3.1.mp4",
      "-vf", "scale=720:1280", "-c:v", "libx264", "-preset", "medium",
      "-b:v", "400k", "-maxrate", "500k", "-bufsize", "1000k",
      "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart",
-     f"{FINAL}/mutanabbi-albayt-phone-v3.mp4"])
+     f"{FINAL}/mutanabbi-albayt-phone-v3.1.mp4"])
 
 # ---- SRT ----
 def srt_time(t):
@@ -90,10 +95,10 @@ with open(f"{FINAL}/mutanabbi-albayt.srt", "w", encoding="utf-8") as f:
 # ---- contact sheet: 28 stills, 4 cols x 7 rows at 270x480 ----
 cols, rows, tw, th = 4, 7, 270, 480
 sheet = Image.new("RGB", (cols * tw, rows * th), (20, 20, 20))
-files = sorted(os.listdir(f"{BUILD}/stills_v3"))
+files = sorted(os.listdir(f"{BUILD}/stills_v3_horsefix"))
 for k, fn in enumerate(files):
-    im = Image.open(f"{BUILD}/stills/{fn}").resize((tw, th))
+    im = Image.open(f"{BUILD}/stills_v3_horsefix/{fn}").resize((tw, th))
     sheet.paste(im, ((k % cols) * tw, (k // cols) * th))
-sheet.save(f"{BUILD}/contact_sheet_v3.jpg", quality=85)
-print("contact sheet:", f"{BUILD}/contact_sheet_v3.jpg")
+sheet.save(f"{BUILD}/contact_sheet_v3_horsefix.jpg", quality=85)
+print("contact sheet:", f"{BUILD}/contact_sheet_v3_horsefix.jpg")
 print("DONE")

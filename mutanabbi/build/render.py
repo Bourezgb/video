@@ -1,15 +1,29 @@
 #!/usr/bin/env python3
-"""render_v3 — Mutanabbi scenes rebuilt under the 8 mandatory scene-quality
-rules (scene-kit.md, from the v2 critique). Only the DRAWING changed vs v2.
-Same timeline, audio, music, script and plan.
-1080x1920, silhouettes only, no faces, no blood.
-Text: Pillow raqm RTL shaping (direction='rtl', language='ar') — do NOT use
-arabic_reshaper/bidi, that garbles text."""
+"""render_v3_horsefix — candidate v3.1: render_v3.py with ONLY the horse fixed.
+Diff vs render_v3.py (verified 2026-11-17, stills in build/horsefix-check/):
+  * horse2() front-leg knees were on the wrong side in stand/walk poses
+    (knee x = -50 for a leg at x = +28/+62), so the front legs zigzagged
+    across the body and read as a collapsed/camel leg. Knees now stay on
+    their own side (+32/+58). Gallop legs were already correct, untouched.
+  * tail: was a hook sticking out into the sky (X -134, Y +92); now flows
+    straight down along the rear edge, ending at Y +82.
+  * neck: 36*s -> 27*s thick; muzzle lengthened to X(180); jagged mane
+    polygon (which left a white slit) replaced by a thin ridge line.
+  * verse2a only: horse 1.6 -> 1.9 at (500,880), rider 380 -> 270 tall at
+    (440,625) so the horse, not the rider, fills the frame; rider set back
+    so the neck/head stay clear.
+No audio, timing, music, script, captions or other scenes changed.
+Same timeline, audio, music, script and plan as v3; 1080x1920, silhouettes
+only, no faces, no blood. Text: Pillow raqm RTL shaping
+(direction='rtl', language='ar') — do NOT use arabic_reshaper/bidi.
+To build v3.1: run this file (renders stills_v3_horsefix/), then assemble
+with assemble_v3.py pointed at the new stills. Full video NOT yet built.
+"""
 import json, math, os, random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 BASE = os.path.expanduser("~/workspace/bayt-wa-hikaya/mutanabbi-video")
-OUT = f"{BASE}/build/stills_v3"
+OUT = f"{BASE}/build/stills_v3_horsefix"
 os.makedirs(OUT, exist_ok=True)
 W, H = 1080, 1920
 CRIMSON = (184, 72, 58)
@@ -303,15 +317,15 @@ def horse2(d, x, y, s, col, pose="walk", direction=1):
     def Y(v):
         return y + v * s
     # tail first (behind the body): soft S-curve
-    d.line([(X(-88), Y(-28)), (X(-128), Y(0)), (X(-138), Y(52)), (X(-118), Y(92))],
-           fill=col + (255,), width=int(18 * s), joint="curve")
+    d.line([(X(-84), Y(-30)), (X(-96), Y(8)), (X(-98), Y(48)), (X(-90), Y(82))],
+           fill=col + (255,), width=int(14 * s), joint="curve")
     # legs: short, thick, two-segment, hooves on the ground line Y(108)
     if pose == "gallop":
         legs = [(-62, -78, -96, 108), (-28, -46, -58, 108), (34, 58, 84, 108), (64, 84, 108, 108)]
     elif pose == "stand":
-        legs = [(-62, -58, -56, 108), (-26, -50, -28, 108), (28, -50, 30, 108), (62, -58, 58, 108)]
+        legs = [(-62, -58, -56, 108), (-26, -22, -28, 108), (28, 32, 30, 108), (62, 58, 58, 108)]
     else:  # walk
-        legs = [(-62, -58, -44, 108), (-26, -50, -40, 108), (28, -50, 46, 108), (62, -58, 52, 108)]
+        legs = [(-62, -58, -44, 108), (-26, -22, -40, 108), (28, 32, 46, 108), (62, 58, 52, 108)]
     for (lx, lx2, lx3, ly) in legs:
         d.line([(X(lx), Y(18)), (X(lx2), Y(66)), (X(lx3), Y(ly))], fill=col + (255,),
                width=int(19 * s), joint="curve")
@@ -319,16 +333,14 @@ def horse2(d, x, y, s, col, pose="walk", direction=1):
     # body: smooth ellipse barrel
     d.ellipse([X(-96), Y(-58), X(92), Y(42)], fill=col + (255,))
     # neck: one thick curved line from shoulder to poll (smooth arch)
-    d.line([(X(58), Y(-30)), (X(88), Y(-72)), (X(108), Y(-108)), (X(122), Y(-128))],
-           fill=col + (255,), width=int(36 * s), joint="curve")
+    d.line([(X(58), Y(-30)), (X(86), Y(-70)), (X(104), Y(-106)), (X(118), Y(-128))],
+           fill=col + (255,), width=int(27 * s), joint="curve")
     # mane: dark jagged ridge on the upper edge of the neck
-    d.polygon([(X(52), Y(-52)), (X(78), Y(-92)), (X(70), Y(-70)), (X(94), Y(-108)),
-               (X(88), Y(-82)), (X(110), Y(-124)), (X(104), Y(-94)), (X(120), Y(-128)),
-               (X(128), Y(-100)), (X(100), Y(-58)), (X(74), Y(-28))],
-              fill=lerp(col, (0, 0, 0), 0.35) + (255,))
+    d.line([(X(48), Y(-44)), (X(76), Y(-84)), (X(96), Y(-116)), (X(112), Y(-132))],
+           fill=lerp(col, (0, 0, 0), 0.35) + (255,), width=int(10 * s), joint="curve")
     # head: long muzzle pointing forward-down, two ears
-    d.polygon([(X(112), Y(-136)), (X(152), Y(-124)), (X(166), Y(-104)), (X(146), Y(-90)),
-               (X(122), Y(-98))], fill=col + (255,))
+    d.polygon([(X(110), Y(-138)), (X(156), Y(-128)), (X(180), Y(-106)), (X(158), Y(-88)),
+               (X(120), Y(-96))], fill=col + (255,))
     d.polygon([(X(110), Y(-138)), (X(114), Y(-162)), (X(124), Y(-136))], fill=col + (255,))
     d.polygon([(X(124), Y(-138)), (X(134), Y(-160)), (X(140), Y(-132))], fill=col + (255,))
     # rider is drawn separately by the caller (person2 on the horse's back)
@@ -676,9 +688,9 @@ def render_scene(idx, line):
         # CLOSE-UP: horse's head and rider filling the frame under the moon
         glow(d, 760, 420, 300, (200, 200, 220), 50)
         ground_mound(d, 1093, pal["dune2"], cx=430, width=1000, y_base=1420)
-        horse2(d, 430, 920, 1.6, sil, pose="stand", direction=1)
-        contact_shadow(d, 430, 1093, 130)
-        person2(d, 360, 520, 380, sil, stance="proud", sword=True)
+        horse2(d, 500, 880, 1.9, sil, pose="stand", direction=1)
+        contact_shadow(d, 500, 1093, 150)
+        person2(d, 440, 625, 270, sil, stance="proud", sword=True)
         dust(d, seed=idx + 8, n=30, col=(200, 200, 220), ymin=900, ymax=1400)
         dunes(d, pal, idx)
         foreground_crest(d, sil, y0=1660)
